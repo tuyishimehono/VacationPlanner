@@ -8,4 +8,7 @@ class TripCreate(BaseModel):
 
 class Trip(TripCreate):
     id: int
+    owner_id: int
 
+class MessageResponse(BaseModel):
+    message: str
