@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 from app.main import app
+from app.schemas.itinerary import DayPlan
 
 client = TestClient(app)
 
@@ -24,10 +25,12 @@ def test_other_users_trip_is_hidden():
     trip_id = client.post("/trips/", headers=owner, json={"destination": "Rome", "days": 3, "budget": 1000, "trip_style": "luxury"}).json()["id"]
     assert client.get(f"/trips/{trip_id}", headers=other).status_code == 404
 
-def test_create_and_get_itinerary():
+def test_create_and_get_itinerary(monkeypatch):
+    days = [DayPlan(day=1, activities=["Eiffel Tower", "Seine River Walk"])]
+    monkeypatch.setattr("app.routers.itinerary.generate_itinerary", lambda trip: days)
     headers = auth_headers()
-    trip_id = client.post("/trips/", headers=headers, json={"destination": "Paris", "days": 2, "budget": 2000, "trip_style": "culture"}).json()["id"]
-    itinerary = {"trip_id": trip_id, "days": [{"day": 1, "activities": ["Eiffel Tower", "Seine River Walk"]}]}
-    assert client.post("/itineraries/", headers=headers, json=itinerary).status_code == 201
+    trip_id = client.post("/trips/", headers=headers, json={"destination": "Paris", "days": 1, "budget": 2000, "trip_style": "culture"}).json()["id"]
+    itinerary = {"trip_id": trip_id, "days": [d.model_dump() for d in days]}
+    assert client.post("/itineraries/", headers=headers, json={"trip_id": trip_id}).status_code == 201
     assert client.get(f"/itineraries/{trip_id}", headers=headers).json() == itinerary
-    assert client.post("/itineraries/", headers=headers, json=itinerary).status_code == 409
+    assert client.post("/itineraries/", headers=headers, json={"trip_id": trip_id}).status_code == 409
